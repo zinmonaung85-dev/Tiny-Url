@@ -28,7 +28,7 @@ model Url {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  shortCode   String    @unique
+  shortCode   String
   originalUrl String
   expiresAt   DateTime?
   clickCount  Int       @default(0)
@@ -38,7 +38,7 @@ model Url {
 
   visits Visit[]
 
-  @@index([userId])
+  @@unique([shortCode, userId])
 }
 
 model Visit {
