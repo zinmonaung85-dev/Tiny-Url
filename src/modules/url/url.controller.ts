@@ -1,10 +1,11 @@
-import { Controller, Post, Body, UseGuards, Get, Res, Param, Ip, Headers, UsePipes, ValidationPipe } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Get, Res, Param, Ip, Headers, UsePipes, ValidationPipe, Patch, Delete } from '@nestjs/common';
 import type { Response } from 'express';
 import { UrlService } from './url.service';
 import { ShortenUrlDto } from './dtos/shorten-url.dto';
 import { AuthGuard } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { GetUrlListDto } from './dtos/get-urls.dto';
+import { UpdateUrlDto } from './dtos/update-url.dto';
 
 @Controller('urls')
 export class UrlController {
@@ -59,4 +60,39 @@ export class UrlController {
             message: 'Fetched URLs successfully!'
         };
     }
+
+    @Patch(':id')
+    @UseGuards(AuthGuard)
+    @UsePipes(new ValidationPipe({ transform: true }))
+
+    async updateUrl(
+        @CurrentUser('id') userId: string,
+        @Param('id') id: string,
+        @Body() input: UpdateUrlDto
+    ) {
+        const updatedUrl = await this.urlService.updateUrl(userId, id, input);
+
+        return {
+            success: true,
+            data: updatedUrl,
+            message: "Updated URL successfully!"
+        };
+    }
+
+    @Delete(':id')
+    @UseGuards(AuthGuard)
+
+    async deleteUrl(
+        @CurrentUser('id') userId: string,
+        @Param('id') id: string,
+    ) {
+        const deletedUrl = await this.urlService.deleteUrl(userId, id);
+
+        return {
+            success: true,
+            data: deletedUrl,
+            message: "Deleted URL successfully!"
+        };
+    }
+
 }

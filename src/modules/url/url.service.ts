@@ -2,6 +2,7 @@ import { Injectable, ConflictException, NotFoundException, BadRequestException }
 import { PrismaService } from '../../prisma/prisma.service';
 import { ShortenUrlDto } from './dtos/shorten-url.dto';
 import { GetUrlListDto } from './dtos/get-urls.dto';
+import { UpdateUrlDto } from './dtos/update-url.dto';
 import { HashingService } from '../../modules/hashing/hashing.service';
 
 
@@ -153,5 +154,54 @@ export class UrlService {
             size: input.size,
             totalPages: Math.ceil(totalUrls / size),
         };
+    }
+
+    async updateUrl(userId: string, id: string, input: UpdateUrlDto): Promise<any> {
+
+        const url = await this.prisma.url.findFirst({
+            where: {
+                userId,
+                id,
+                deletedAt: null
+            }
+        });
+
+        if (!url) {
+            throw new NotFoundException("Url not found");
+        }
+
+        const updatedUrl = await this.prisma.url.update({
+            where: {
+                id
+            },
+            data: input
+        });
+
+        return updatedUrl;
+    }
+
+
+    async deleteUrl(userId: string, id: string): Promise<any> {
+
+        const url = await this.prisma.url.findFirst({
+            where: {
+                userId,
+                id,
+                deletedAt: null
+            }
+        });
+
+        if (!url) {
+            throw new NotFoundException("Url not found");
+        }
+
+        const deletedUrl = await this.prisma.url.update({
+            where: {
+                id,
+            },
+            data: { deletedAt: new Date() }
+        });
+
+        return deletedUrl;
     }
 }
