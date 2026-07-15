@@ -1,10 +1,10 @@
-import { Controller, Post, Body, UseGuards, Get, Res, Param, Ip, Headers } from '@nestjs/common';
-import * as Express from 'express';
+import { Controller, Post, Body, UseGuards, Get, Res, Param, Ip, Headers, UsePipes, ValidationPipe } from '@nestjs/common';
+import type { Response } from 'express';
 import { UrlService } from './url.service';
 import { ShortenUrlDto } from './dtos/shorten-url.dto';
-import { TrackVisitDto } from './dtos/track-visit.dto';
 import { AuthGuard } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { GetUrlListDto } from './dtos/get-urls.dto';
 
 @Controller('urls')
 export class UrlController {
@@ -30,28 +30,33 @@ export class UrlController {
     @Get('redir/:shortCode')
     async redirect(
         @Param('shortCode') shortCode: string,
-        @Res() res: Express.Response,
+        @Ip() ip: string,
+        @Headers('user-agent') userAgent: string,
+        @Res() res: Response,
     ) {
-        const originalUrl = await this.urlService.redirectUrl(shortCode);
+        const result = await this.urlService.redirectUrl(shortCode, ip, userAgent);
 
         return res.status(200).json({
             success: true,
-            originalUrl: originalUrl,
-            message: 'Found original URL successfully!'
+            originalUrl: result.originalUrl,
+            analytics: result.analytics,
+            message: 'Found original URL and tracked visit successfully!'
         });
     }
 
-    @Post('track')
-    async track(
-        @Body() dto: TrackVisitDto,
-        @Ip() ip: string,
-        @Headers('user-agent') userAgent: string,
+    @Get()
+    @UseGuards(AuthGuard)
+    @UsePipes(new ValidationPipe({ transform: true }))
+
+    async getUrls(
+        @CurrentUser('id') userId: string,
+        @Body() input: GetUrlListDto
     ) {
-        const visits = await this.urlService.trackVisit(dto.shortCode, ip, userAgent);
+        const result = await this.urlService.getUrls(userId, input);
         return {
             success: true,
-            data: visits,
-            message: 'Tracked user visits successfully!',
+            data: result,
+            message: 'Fetched URLs successfully!'
         };
     }
 }

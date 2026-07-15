@@ -1,6 +1,7 @@
 import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ShortenUrlDto } from './dtos/shorten-url.dto';
+import { GetUrlListDto } from './dtos/get-urls.dto';
 import { HashingService } from '../../modules/hashing/hashing.service';
 
 
@@ -53,7 +54,8 @@ export class UrlService {
         };
     }
 
-    async redirectUrl(shortCode: string): Promise<any> {
+    async redirectUrl(shortCode: string, ip: string, userAgent?: string): Promise<any> {
+
         const url = await this.prisma.url.findFirst({
             where: {
                 shortCode,
@@ -63,24 +65,11 @@ export class UrlService {
         });
 
         if (!url) {
-            return null;
+            throw new NotFoundException('Requested short URL was not found.');
         }
 
         if (url.expiresAt && new Date() > url.expiresAt) {
             throw new BadRequestException('This short URL has expired.');
-        }
-
-        return url.originalUrl;
-    }
-
-    async trackVisit(shortCode: string, ip: string, userAgent?: string) {
-        const url = await this.prisma.url.findFirst({
-            where: { shortCode, deletedAt: null },
-            select: { id: true }
-        });
-
-        if (!url) {
-            throw new NotFoundException('Requested short URL was not found.');
         }
 
         const ipHash = this.hashingService.hashIp(ip);
@@ -92,7 +81,6 @@ export class UrlService {
                     clickCount: { increment: 1 }
                 },
             }),
-
             this.prisma.visit.create({
                 data: {
                     urlId: url.id,
@@ -102,13 +90,68 @@ export class UrlService {
             }),
         ]);
 
+        let targetUrl = url.originalUrl ? url.originalUrl.trim() : '';
+        if (targetUrl && !/^https?:\/\//i.test(targetUrl)) {
+            targetUrl = `https://${targetUrl}`;
+        }
+
         return {
-            totalClicks: updatedUrl.clickCount,
-            latestVisit: {
-                id: newVisit.id,
-                userAgent: newVisit.userAgent,
-                trackedAt: newVisit.createdAt
+            originalUrl: targetUrl,
+            analytics: {
+                totalClicks: updatedUrl.clickCount,
+                latestVisit: {
+                    id: newVisit.id,
+                    userAgent: newVisit.userAgent,
+                    trackedAt: newVisit.createdAt
+                }
             }
+        };
+    }
+
+    async getUrls(userId: string, input: GetUrlListDto): Promise<any> {
+
+        const page = input.page ?? 1;
+        const size = input.size ?? 10;
+
+        const skip = (page - 1) * size;
+
+        const [totalUrls, data] = await Promise.all([
+            this.prisma.url.count({
+                where: {
+                    userId,
+                    deletedAt: null,
+                }
+            }),
+
+            this.prisma.url.findMany({
+                where: {
+                    userId,
+                    deletedAt: null,
+                },
+
+                skip,
+                take: size,
+
+                include: {
+                    _count: {
+                        select: {
+                            visits: true,
+                        }
+                    }
+                },
+                orderBy: {
+                    createdAt: 'desc'
+                }
+            })
+        ]);
+
+        return {
+            urls: data,
+            totalUrls,
+            urlCount: data.length,
+            page: input.page,
+            size: input.size,
+            totalPages: Math.ceil(totalUrls / size),
         };
     }
 }
