@@ -3,7 +3,10 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ShortenUrlDto } from './dtos/shorten-url.dto';
 import { GetUrlListDto } from './dtos/get-urls.dto';
 import { UpdateUrlDto } from './dtos/update-url.dto';
+import { GetAnalyticsDto } from './dtos/get-analytics.dto';
 import { HashingService } from '../../modules/hashing/hashing.service';
+import { VisitWhereInput } from '../../generated/prisma/models';
+import { Prisma } from '../../generated/prisma/browser';
 
 
 @Injectable()
@@ -204,4 +207,84 @@ export class UrlService {
 
         return deletedUrl;
     }
+
+
+    async analytics(id: string, userId: string, input: GetAnalyticsDto): Promise<any> {
+
+        const url = await this.prisma.url.findFirst({
+            where: {
+                id,
+                userId,
+                deletedAt: null
+            }
+        });
+
+        if (!url) {
+            throw new NotFoundException("Url not found");
+        }
+
+        const where: Prisma.VisitWhereInput = {
+            urlId: id
+        };
+
+        if (input.startDate || input.endDate) {
+            where.createdAt = {};
+
+            if (input.startDate) {
+                where.createdAt.gte = new Date(input.startDate);
+            }
+
+            if (input.endDate) {
+                where.createdAt.lte = new Date(input.endDate);
+            }
+
+        }
+
+        const visits = await this.prisma.visit.findMany({
+            where,
+            select: {
+                ipHash: true,
+                createdAt: true,
+            },
+            orderBy: {
+                createdAt: 'asc'
+            },
+        });
+
+        const totalClicks = visits.length;
+        const uniqueVisitors = new Set(visits.map((v) => v.ipHash)).size;
+        const lastVisitedAt = visits.length > 0 ? visits[visits.length - 1].createdAt : null;
+
+        const dailyClicks: { date: string; clicks: number }[] = [];
+
+        for (const visit of visits) {
+
+            const date = visit.createdAt.toISOString().split('T')[0];
+            const index = dailyClicks.findIndex(item => item.date === date);
+
+            if (index === -1) {
+                dailyClicks.push({
+                    date,
+                    clicks: 1,
+                });
+            } else {
+                dailyClicks[index].clicks++;
+            }
+        }
+
+        return {
+            urlInfo: {
+                id: url.id,
+                originalUrl: url.originalUrl,
+                shortCode: url.shortCode,
+                createdAt: url.createdAt,
+            },
+            totalClicks,
+            uniqueVisitors,
+            lastVisitedAt,
+            dailyClicks,
+        };
+
+    }
 }
+

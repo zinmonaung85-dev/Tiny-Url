@@ -5,6 +5,7 @@ import { ShortenUrlDto } from './dtos/shorten-url.dto';
 import { AuthGuard } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { GetUrlListDto } from './dtos/get-urls.dto';
+import { GetAnalyticsDto } from './dtos/get-analytics.dto';
 import { UpdateUrlDto } from './dtos/update-url.dto';
 
 @Controller('urls')
@@ -92,6 +93,24 @@ export class UrlController {
             success: true,
             data: deletedUrl,
             message: "Deleted URL successfully!"
+        };
+    }
+
+    @Get(':id/analytics')
+    @UseGuards(AuthGuard)
+    @UsePipes(new ValidationPipe({ transform: true }))
+
+    async analytics(
+        @Param('id') id: string,
+        @CurrentUser('id') userId: string,
+        @Body() input: GetAnalyticsDto
+    ) {
+        const analytics = await this.urlService.analytics(id, userId, input);
+
+        return {
+            success: true,
+            data: analytics,
+            message: "Fetched analytics successfully!"
         };
     }
 
