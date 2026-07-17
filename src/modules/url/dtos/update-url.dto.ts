@@ -1,7 +1,4 @@
-import { IsUrl, IsNotEmpty } from 'class-validator';
+import { PartialType } from '@nestjs/swagger';
+import { ShortenUrlDto } from './shorten-url.dto';
 
-export class UpdateUrlDto {
-    @IsUrl()
-    @IsNotEmpty()
-    originalUrl!: string;
-}
+export class UpdateUrlDto extends PartialType(ShortenUrlDto) { }

@@ -19,7 +19,7 @@ export class AuthGuard implements CanActivate {
         }
 
         const [type, token] = authHeader.split(' ');
-        if (type !== 'JWT' || !token) {
+        if ((type !== 'JWT' && type !== 'Bearer') || !token) {
             throw new UnauthorizedException('Invalid authorization header format');
         }
 
