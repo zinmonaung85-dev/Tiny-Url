@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, Get, Res, Param, Query, Ip, Headers, UsePipes, ValidationPipe, Patch, Delete } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Get, Res, Param, Query, Ip, Headers, Patch, Delete } from '@nestjs/common';
 import type { Response } from 'express';
 import { UrlService } from './url.service';
 import { ShortenUrlDto } from './dtos/shorten-url.dto';
@@ -8,8 +8,11 @@ import { GetUrlListDto } from './dtos/get-urls.dto';
 import { GetAnalyticsDto } from './dtos/get-analytics.dto';
 import { UpdateUrlDto } from './dtos/update-url.dto';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiHeader } from '@nestjs/swagger';
+import { Public } from '../auth/decorators/public.decorator';
+
 
 @ApiTags('URL Shortener')
+@UseGuards(AuthGuard)
 @Controller('urls')
 export class UrlController {
     constructor(
@@ -17,7 +20,6 @@ export class UrlController {
     ) { }
 
     @Post('shorten')
-    @UseGuards(AuthGuard)
     @ApiBearerAuth('JWT')
     @ApiOperation({ summary: 'Create a shortened URL' })
     create(
@@ -34,6 +36,7 @@ export class UrlController {
     }
 
     @Get('redir/:shortCode')
+    @Public()
     @ApiOperation({ summary: 'Redirect short code to original URL and track analytics' })
     @ApiParam({ name: 'shortCode', description: 'The unique code of shortened URL' })
     @ApiHeader({
@@ -57,8 +60,6 @@ export class UrlController {
     }
 
     @Get()
-    @UseGuards(AuthGuard)
-    @UsePipes(new ValidationPipe({ transform: true }))
     @ApiBearerAuth('JWT')
     @ApiOperation({ summary: 'Get all URLs created by the current user' })
 
@@ -75,8 +76,6 @@ export class UrlController {
     }
 
     @Patch(':id')
-    @UseGuards(AuthGuard)
-    @UsePipes(new ValidationPipe({ transform: true }))
     @ApiBearerAuth('JWT')
     @ApiOperation({ summary: 'Update a shortened URL by ID' })
     @ApiParam({ name: 'id', description: 'URL ID' })
@@ -96,7 +95,6 @@ export class UrlController {
     }
 
     @Delete(':id')
-    @UseGuards(AuthGuard)
     @ApiBearerAuth('JWT')
     @ApiOperation({ summary: 'Delete a shortened URL by ID' })
     @ApiParam({ name: 'id', description: 'URL ID' })
@@ -115,8 +113,6 @@ export class UrlController {
     }
 
     @Get(':id/analytics')
-    @UseGuards(AuthGuard)
-    @UsePipes(new ValidationPipe({ transform: true }))
     @ApiBearerAuth('JWT')
     @ApiOperation({ summary: 'Get analytics for a specific URL' })
     @ApiParam({ name: 'id', description: 'URL ID' })
