@@ -1,13 +1,18 @@
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '../../prisma/prisma.module';
-import { UrlController } from './url.controller';
 import { UrlService } from './url.service';
+import { UrlRepository } from './url.repository';
+import { UrlController } from './url.controller';
+import { HashingModule } from '../../modules/hashing/hashing.module';
 
 @Module({
   imports: [
-    PrismaModule,
+    HashingModule
   ],
   controllers: [UrlController],
-  providers: [UrlService],
+  providers: [
+    UrlService,
+    UrlRepository
+  ],
+  exports: [UrlService]
 })
 export class UrlModule { }
