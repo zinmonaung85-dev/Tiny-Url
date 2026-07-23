@@ -1,25 +1,25 @@
-import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
-import { UrlRepository } from './url.repository';
-import { ShortenUrlDto } from './dtos/shorten-url.dto';
-import { GetUrlListDto } from './dtos/get-urls.dto';
-import { UpdateUrlDto } from './dtos/update-url.dto';
-import { GetAnalyticsDto } from './dtos/get-analytics.dto';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { HashingService } from '../../modules/hashing/hashing.service';
-import { Prisma } from '../../generated/prisma/browser';
+import { GetAnalyticsDto } from './dtos/get-analytics.dto';
+import { GetUrlListDto } from './dtos/get-urls.dto';
+import { ShortenUrlDto } from './dtos/shorten-url.dto';
+import { UpdateUrlDto } from './dtos/update-url.dto';
+import { URL_REPOSITORY, type URLRepository } from './repository.interface';
+import { UrlDto } from './dtos/url.dto';
 
 @Injectable()
 export class UrlService {
     constructor(
-        private readonly repo: UrlRepository,
+        @Inject(URL_REPOSITORY) private readonly repo: URLRepository,
         private readonly hashingService: HashingService,
+        @Inject('REDIS_CONN') private readonly redis: any,
     ) { }
 
     async create(userId: string, dto: ShortenUrlDto) {
-
         const shortCode = this.hashingService.generateShortCode(dto.originalUrl, userId);
 
         const existingUrl = await this.repo.findShortCodeWithUser(shortCode, userId);
-
         if (existingUrl) {
             throw new ConflictException('Short URL already exists for this user.');
         }
@@ -27,14 +27,14 @@ export class UrlService {
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + 7);
 
-        const url = await this.repo.create({
-            originalUrl: dto.originalUrl,
+        const urlDto = new UrlDto({
+            userId,
             shortCode,
+            originalUrl: dto.originalUrl,
             expiresAt,
-            user: {
-                connect: { id: userId }
-            }
         });
+
+        const url = await this.repo.create(urlDto);
 
         return {
             id: url.id,
@@ -54,7 +54,7 @@ export class UrlService {
             throw new NotFoundException('Requested short URL was not found.');
         }
 
-        if (url.expiresAt && new Date() > url.expiresAt) {
+        if (url.expiresAt && new Date() > new Date(url.expiresAt)) {
             throw new BadRequestException('This short URL has expired.');
         }
 
@@ -73,9 +73,9 @@ export class UrlService {
                 latestVisit: {
                     id: newVisit.id,
                     userAgent: newVisit.userAgent,
-                    trackedAt: newVisit.createdAt
-                }
-            }
+                    trackedAt: newVisit.createdAt,
+                },
+            },
         };
     }
 
@@ -86,7 +86,7 @@ export class UrlService {
 
         const [totalUrls, data] = await Promise.all([
             this.repo.countActiveUrls(userId),
-            this.repo.findManyWithPagination(userId, skip, size)
+            this.repo.findManyWithPagination(userId, skip, size),
         ]);
 
         return {
@@ -100,31 +100,28 @@ export class UrlService {
     }
 
     async updateUrl(userId: string, id: string, input: UpdateUrlDto): Promise<any> {
-
         const url = await this.repo.findActiveById(id, userId);
 
         if (!url) {
-            throw new NotFoundException("Url not found");
+            throw new NotFoundException('Url not found');
         }
 
         return this.repo.updateUrl(id, input);
     }
 
     async deleteUrl(userId: string, id: string): Promise<any> {
-
         const url = await this.repo.findActiveById(id, userId);
         if (!url) {
-            throw new NotFoundException("Url not found");
+            throw new NotFoundException('Url not found');
         }
 
         return this.repo.deleteUrl(id);
     }
 
     async analytics(id: string, userId: string, input: GetAnalyticsDto): Promise<any> {
-
         const url = await this.repo.findActiveById(id, userId);
         if (!url) {
-            throw new NotFoundException("Url not found");
+            throw new NotFoundException('Url not found');
         }
 
         const where: Prisma.VisitWhereInput = { urlId: id };
@@ -143,8 +140,8 @@ export class UrlService {
 
         const dailyClicks: { date: string; clicks: number }[] = [];
         for (const visit of visits) {
-            const date = visit.createdAt.toISOString().split('T')[0];
-            const index = dailyClicks.findIndex(item => item.date === date);
+            const date = new Date(visit.createdAt).toISOString().split('T')[0];
+            const index = dailyClicks.findIndex((item) => item.date === date);
 
             if (index === -1) {
                 dailyClicks.push({ date, clicks: 1 });
@@ -165,5 +162,11 @@ export class UrlService {
             lastVisitedAt,
             dailyClicks,
         };
+    }
+
+    async testRedis() {
+        await this.redis.set('test', 'Hello Redis');
+        const value = await this.redis.get('test');
+        return { message: 'Redis is working!', value };
     }
 }

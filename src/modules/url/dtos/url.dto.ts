@@ -9,7 +9,17 @@ export class UrlDto {
     updatedAt!: Date;
     deletedAt?: Date | null;
 
-    constructor(partial: Partial<UrlDto>) {
-        Object.assign(this, partial);
+    constructor(partial?: Partial<UrlDto>) {
+        if (partial) {
+            Object.assign(this, partial);
+        }
+    }
+
+    toPlain() {
+        return {
+            id: this.id,
+            userId: this.userId,
+            createdAt: this.createdAt,
+        };
     }
 }

@@ -1,18 +1,21 @@
 import { Module } from '@nestjs/common';
-import { UrlService } from './url.service';
-import { UrlRepository } from './url.repository';
-import { UrlController } from './url.controller';
 import { HashingModule } from '../../modules/hashing/hashing.module';
+import { RedisService } from './redis.service';
+import { UrlController } from './url.controller';
+import { UrlRepository } from './url.repository';
+import { UrlService } from './url.service';
+import { URL_REPOSITORY } from './repository.interface';
+import { CachedURLRepositoryDecorator } from './cached-url-repository.decorator';
 
 @Module({
-  imports: [
-    HashingModule
-  ],
+  imports: [HashingModule],
   controllers: [UrlController],
   providers: [
     UrlService,
-    UrlRepository
+    UrlRepository,
+    RedisService,
+    { provide: URL_REPOSITORY, useClass: CachedURLRepositoryDecorator },
   ],
-  exports: [UrlService]
+  exports: [],
 })
 export class UrlModule { }
